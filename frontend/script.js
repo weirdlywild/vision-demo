@@ -430,18 +430,69 @@ function displayDiagnosis(data, isFollowUp = false) {
 
         html += '</div>'; // diagnosis-content
     } else {
-        // For follow-up responses, show simplified view
-        html += `<p><strong>Updated information:</strong></p>`;
+        // For follow-up responses, show enhanced view
+        html += '<div class="followup-content">';
+
+        html += `<div class="section-title">💬 Answer</div>`;
         html += `<p>${data.diagnosis}</p>`;
 
-        // Show any new materials/steps
+        // Professional help warning (if present in followup)
+        if (data.professional_help_recommended && data.professional_help_recommended !== 'none') {
+            html += '<div class="professional-warning">';
+            html += `<div class="warning-icon">⚠️</div>`;
+            html += `<div>`;
+            html += `<strong>Professional Help Recommended: ${data.professional_help_recommended}</strong>`;
+            if (data.professional_help_reason) {
+                html += `<div class="reason">${data.professional_help_reason}</div>`;
+            }
+            html += `</div>`;
+            html += '</div>';
+        }
+
+        // Show any new materials
         if (data.materials && data.materials.length > 0) {
-            html += '<p><strong>Materials:</strong></p><ul>';
+            html += '<div class="section">';
+            html += '<div class="section-title">🛒 Additional Materials</div>';
+            html += '<ul class="materials-list">';
             data.materials.forEach(mat => {
-                html += `<li>${mat.name}</li>`;
+                html += `<li>
+                    <div><strong>${mat.name}</strong></div>
+                    <div class="material-category">${mat.category}</div>
+                </li>`;
             });
             html += '</ul>';
+            html += '</div>';
         }
+
+        // Show any new steps
+        if (data.repair_steps && data.repair_steps.length > 0) {
+            html += '<div class="section">';
+            html += '<div class="section-title">📝 Additional Steps</div>';
+            html += '<ol class="steps-list">';
+            data.repair_steps.forEach(step => {
+                html += `<li>
+                    <strong>${step.title}</strong>
+                    <p>${step.instruction}</p>
+                    ${step.safety_tip ? `<div class="safety-tip">💡 ${step.safety_tip}</div>` : ''}
+                </li>`;
+            });
+            html += '</ol>';
+            html += '</div>';
+        }
+
+        // Show any warnings
+        if (data.warnings && data.warnings.length > 0) {
+            html += '<div class="section warnings-section">';
+            html += '<div class="section-title">⚠️ Safety Warnings</div>';
+            html += '<ul class="warnings-list">';
+            data.warnings.forEach(warning => {
+                html += `<li>${warning}</li>`;
+            });
+            html += '</ul>';
+            html += '</div>';
+        }
+
+        html += '</div>'; // followup-content
     }
 
     html += '</div>'; // message-content

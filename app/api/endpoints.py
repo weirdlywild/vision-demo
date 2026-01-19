@@ -37,8 +37,11 @@ async def diagnose(
     }
 
     try:
+        print(f"DEBUG: /diagnose called - session_id={session_id}, question={question[:50] if question else None}")
+
         # Handle follow-up question (ignore dummy image)
         if question and session_id:
+            print(f"DEBUG: Routing to _handle_followup")
             return await _handle_followup(session_id, question, start_time)
 
         # Read image bytes
@@ -126,6 +129,9 @@ async def diagnose(
         )
 
     except Exception as e:
+        print(f"ERROR in main diagnose endpoint: {type(e).__name__}: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 
@@ -149,39 +155,90 @@ async def _handle_followup(session_id: str, question: str, start_time: float) ->
 
     # Get previous diagnosis
     previous_diagnosis = session_manager.get_latest_diagnosis(session_id)
+    if not previous_diagnosis:
+        raise HTTPException(
+            status_code=404,
+            detail="No previous diagnosis found in session. Please start a new diagnosis."
+        )
 
     # Call GPT for follow-up
     openai_start = time.time()
     try:
+        print(f"DEBUG: Calling vision_service.handle_followup for session {session_id}")
+        print(f"DEBUG: Question: {question}")
+        print(f"DEBUG: Context: {context[:100] if context else 'None'}...")
+
         followup_response = await vision_service.handle_followup(
             question, context, previous_diagnosis
         )
         timing['openai_api_time'] = time.time() - openai_start
+
+        print(f"DEBUG: Followup response received: {followup_response.keys() if isinstance(followup_response, dict) else type(followup_response)}")
+
     except VisionServiceError as e:
+        print(f"ERROR: VisionServiceError in followup: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Vision service error: {str(e)}")
+    except Exception as e:
+        print(f"ERROR: Unexpected error calling vision service: {type(e).__name__}: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error during followup: {str(e)}")
 
     # Normalize any additional materials
-    norm_start = time.time()
-    if 'additional_materials' in followup_response:
-        followup_response['additional_materials'] = MaterialNormalizer.normalize_materials(
-            followup_response['additional_materials']
+    try:
+        norm_start = time.time()
+        if 'additional_materials' in followup_response:
+            followup_response['additional_materials'] = MaterialNormalizer.normalize_materials(
+                followup_response['additional_materials']
+            )
+        timing['normalization_time'] = time.time() - norm_start
+
+        # Merge follow-up response with previous diagnosis
+        print(f"DEBUG: Merging followup response with previous diagnosis")
+        merged_diagnosis = _merge_followup_response(previous_diagnosis, followup_response)
+        print(f"DEBUG: Merged diagnosis keys: {merged_diagnosis.keys()}")
+
+        # Update session
+        session_manager.update_session(session_id, "followup", merged_diagnosis)
+
+        return _format_diagnosis_response(
+            merged_diagnosis, session_id, timing, time.time() - start_time
         )
-    timing['normalization_time'] = time.time() - norm_start
-
-    # Merge follow-up response with previous diagnosis
-    merged_diagnosis = _merge_followup_response(previous_diagnosis, followup_response)
-
-    # Update session
-    session_manager.update_session(session_id, "followup", merged_diagnosis)
-
-    return _format_diagnosis_response(
-        merged_diagnosis, session_id, timing, time.time() - start_time
-    )
+    except Exception as e:
+        print(f"ERROR: Error in followup post-processing: {type(e).__name__}: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error processing followup: {str(e)}")
 
 
 def _merge_followup_response(previous: dict, followup: dict) -> dict:
     """Merge follow-up response into previous diagnosis."""
+    if not previous:
+        # If no previous diagnosis, create a minimal one from followup
+        previous = {
+            'materials': [],
+            'repair_steps': [],
+            'warnings': [],
+            'diagnosis': '',
+            'confidence': 0.5
+        }
+
     merged = previous.copy()
+
+    print(f"DEBUG MERGE: followup type = {type(followup)}")
+    print(f"DEBUG MERGE: followup keys = {list(followup.keys()) if isinstance(followup, dict) else 'NOT A DICT'}")
+    print(f"DEBUG MERGE: Has 'answer' key? {'answer' in followup if isinstance(followup, dict) else 'N/A'}")
+
+    # Update diagnosis with the followup answer
+    if 'answer' in followup:
+        print(f"DEBUG: Updating diagnosis field with answer (length: {len(followup['answer'])})")
+        print(f"DEBUG: Answer text: {followup['answer'][:200]}...")
+        merged['diagnosis'] = followup['answer']
+        # Also update failure_mode since _format_diagnosis_response prioritizes it
+        merged['failure_mode'] = followup['answer']
+        print(f"DEBUG: Updated merged['diagnosis'] and merged['failure_mode']")
+    else:
+        print(f"DEBUG: 'answer' key NOT FOUND in followup! Keeping old diagnosis")
 
     # Add additional materials
     if 'additional_materials' in followup:

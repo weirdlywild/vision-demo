@@ -16,25 +16,25 @@ RESPONSE GUIDELINES:
 6. Keep the response focused and concise
 
 OUTPUT FORMAT (JSON only):
-{
+{{
   "answer": "detailed response to the user's question",
   "additional_steps": [
-    {
+    {{
       "step": 1,
       "title": "title",
       "instruction": "instruction",
       "safety_tip": "optional"
-    }
+    }}
   ],
   "additional_materials": [
-    {
+    {{
       "name": "generic name",
       "category": "category",
       "search_query": "search term"
-    }
+    }}
   ],
   "additional_warnings": ["any new safety warnings"]
-}
+}}
 
 COMMON FOLLOW-UP QUESTION TYPES:
 
