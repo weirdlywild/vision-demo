@@ -247,24 +247,39 @@ def _merge_followup_response(previous: dict, followup: dict) -> dict:
     else:
         print(f"DEBUG: 'answer' key NOT FOUND in followup! Keeping old diagnosis")
 
+    # Track counts of original items
+    original_material_count = len(merged.get('materials', []))
+    original_step_count = len(merged.get('repair_steps', []))
+    original_warning_count = len(merged.get('warnings', []))
+
     # Add additional materials
-    if 'additional_materials' in followup:
+    if 'additional_materials' in followup and followup['additional_materials']:
         existing_materials = merged.get('materials', [])
         merged['materials'] = existing_materials + followup['additional_materials']
+        print(f"DEBUG: Added {len(followup['additional_materials'])} new materials")
 
     # Add additional steps
-    if 'additional_steps' in followup:
+    if 'additional_steps' in followup and followup['additional_steps']:
         existing_steps = merged.get('repair_steps', [])
         # Renumber additional steps
         start_step = len(existing_steps) + 1
         for i, step in enumerate(followup['additional_steps']):
             step['step'] = start_step + i
         merged['repair_steps'] = existing_steps + followup['additional_steps']
+        print(f"DEBUG: Added {len(followup['additional_steps'])} new steps")
 
     # Add additional warnings
-    if 'additional_warnings' in followup:
+    if 'additional_warnings' in followup and followup['additional_warnings']:
         existing_warnings = merged.get('warnings', [])
         merged['warnings'] = existing_warnings + followup['additional_warnings']
+        print(f"DEBUG: Added {len(followup['additional_warnings'])} new warnings")
+
+    # For display purposes, return ONLY new items for follow-up
+    # This prevents showing the entire original diagnosis again
+    merged['_original_material_count'] = original_material_count
+    merged['_original_step_count'] = original_step_count
+    merged['_original_warning_count'] = original_warning_count
+    merged['_is_followup'] = True
 
     return merged
 
@@ -319,24 +334,40 @@ def _format_diagnosis_response(
             timing=timing_info
         )
 
-    # Parse materials
+    # For follow-up responses, only include NEW items
+    is_followup = diagnosis.get('_is_followup', False)
+    original_material_count = diagnosis.get('_original_material_count', 0)
+    original_step_count = diagnosis.get('_original_step_count', 0)
+    original_warning_count = diagnosis.get('_original_warning_count', 0)
+
+    # Parse materials (only new ones for follow-ups)
     materials = []
-    for mat in diagnosis.get('materials', []):
+    all_materials = diagnosis.get('materials', [])
+    materials_to_include = all_materials[original_material_count:] if is_followup else all_materials
+
+    for mat in materials_to_include:
         materials.append(Material(
             name=mat.get('name', ''),
             category=mat.get('category', 'other'),
             search_query=mat.get('search_query', mat.get('name', ''))
         ))
 
-    # Parse repair steps
+    # Parse repair steps (only new ones for follow-ups)
     repair_steps = []
-    for step in diagnosis.get('repair_steps', []):
+    all_steps = diagnosis.get('repair_steps', [])
+    steps_to_include = all_steps[original_step_count:] if is_followup else all_steps
+
+    for step in steps_to_include:
         repair_steps.append(RepairStep(
             step=step.get('step', 0),
             title=step.get('title', ''),
             instruction=step.get('instruction', ''),
             safety_tip=step.get('safety_tip')
         ))
+
+    # Parse warnings (only new ones for follow-ups)
+    all_warnings = diagnosis.get('safety_warnings', diagnosis.get('warnings', []))
+    warnings_to_include = all_warnings[original_warning_count:] if is_followup else all_warnings
 
     # Build response
     return DiagnosisResponse(
@@ -348,10 +379,10 @@ def _format_diagnosis_response(
         estimated_time=diagnosis.get('estimated_time'),
         difficulty=diagnosis.get('difficulty'),
         materials=materials,
-        tools_required=diagnosis.get('tools_required', diagnosis.get('tools', [])),
+        tools_required=[] if is_followup else diagnosis.get('tools_required', diagnosis.get('tools', [])),
         repair_steps=repair_steps,
-        warnings=diagnosis.get('safety_warnings', diagnosis.get('warnings', [])),
-        followup_questions=diagnosis.get('followup_questions', []),
+        warnings=warnings_to_include,
+        followup_questions=[] if is_followup else diagnosis.get('followup_questions', []),
         session_id=session_id,
         timing=timing_info
     )
