@@ -382,7 +382,17 @@ CRITICAL: NO brand names, NO URLs, NO SKUs. Use generic product names only."""
                     "model": model or settings.openai_model
                 }
 
-                return response.choices[0].message.content, usage_data
+                # Get content from response
+                content = response.choices[0].message.content if response.choices else None
+
+                # Debug: Log if content is None or empty
+                if not content:
+                    print(f"ERROR: GPT returned empty content! Response: {response}")
+                    print(f"ERROR: Choices: {response.choices if response.choices else 'NO CHOICES'}")
+                    print(f"ERROR: Refusal: {response.choices[0].message.refusal if response.choices and response.choices[0].message else 'NO REFUSAL INFO'}")
+                    raise VisionServiceError("GPT returned empty response")
+
+                return content, usage_data
 
             except RateLimitError as e:
                 if attempt < max_retries - 1:
