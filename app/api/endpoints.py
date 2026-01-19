@@ -77,8 +77,11 @@ async def diagnose(
 
         if cached:
             timing['cache_source'] = 'exact'
+            # Create session even for cached results
+            new_session_id = session_id or session_manager.create_session()
+            session_manager.update_session(new_session_id, sha256_hash, cached)
             return _format_diagnosis_response(
-                cached, session_id, timing, time.time() - start_time
+                cached, new_session_id, timing, time.time() - start_time
             )
 
         # Step 3: Check perceptual cache (similar images)
@@ -88,8 +91,11 @@ async def diagnose(
 
         if cached:
             timing['cache_source'] = 'perceptual'
+            # Create session even for cached results
+            new_session_id = session_id or session_manager.create_session()
+            session_manager.update_session(new_session_id, sha256_hash, cached)
             return _format_diagnosis_response(
-                cached, session_id, timing, time.time() - start_time
+                cached, new_session_id, timing, time.time() - start_time
             )
 
         # Step 4: Call GPT-4o Vision
