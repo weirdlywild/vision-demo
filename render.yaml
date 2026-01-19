@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: vision-demo
+    env: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o
+      - key: OPENAI_MAX_TOKENS
+        value: 800
+      - key: OPENAI_TEMPERATURE
+        value: 0.3
+      - key: MAX_IMAGE_SIZE_MB
+        value: 10
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      - key: CACHE_TTL_SECONDS
+        value: 3600
+      - key: SESSION_TTL_MINUTES
+        value: 30
+    healthCheckPath: /health

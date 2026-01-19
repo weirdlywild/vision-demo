@@ -47,32 +47,9 @@ class VisionService:
         # Encode image to base64
         base64_image = base64.b64encode(image_bytes).decode('utf-8')
 
-        # Enhanced prompt with DSPy-style instructions
-        enhanced_prompt = f"""
-{self.initial_prompt}
-
-CRITICAL OUTPUT REQUIREMENTS:
-- Return ONLY valid JSON
-- NO brand names (e.g., "WD-40" → "penetrating lubricant", "Gorilla Glue" → "strong adhesive")
-- NO product SKUs or model numbers
-- NO URLs or links
-- Use generic, searchable product names only
-
-Required JSON structure:
-{{
-    "object_identified": "what object is this",
-    "failure_mode": "what is broken",
-    "diagnosis": "summary of the issue",
-    "confidence": 0.0-1.0,
-    "issue_type": "plumbing|electrical|door|furniture|appliance|other",
-    "diy_feasible": true|false,
-    "materials": [{{"name": "generic name", "category": "hardware|plumbing|electrical", "search_query": "generic search term"}}],
-    "tools_required": ["tool1", "tool2"],
-    "repair_steps": [{{"step": 1, "title": "step title", "instruction": "detailed instruction", "safety_tip": "safety note"}}],
-    "warnings": ["safety warning 1"],
-    "followup_questions": ["question 1", "question 2"]
-}}
-"""
+        # Ultra-concise prompt for speed
+        enhanced_prompt = """Broken item analysis. JSON format. No brands/SKUs/URLs.
+{"object_identified":"", "failure_mode":"", "diagnosis":"", "confidence":0.8, "issue_type":"other", "diy_feasible":true, "materials":[{"name":"", "category":"", "search_query":""}], "tools_required":[], "repair_steps":[{"step":1, "title":"", "instruction":"", "safety_tip":""}], "warnings":[], "followup_questions":[]}"""
 
         # Build messages
         messages = [
@@ -91,7 +68,7 @@ Required JSON structure:
                         "type": "image_url",
                         "image_url": {
                             "url": f"data:image/jpeg;base64,{base64_image}",
-                            "detail": "high"
+                            "detail": "auto"
                         }
                     }
                 ]

@@ -33,7 +33,7 @@ class ImageProcessor:
         """
         # Check file size
         size_bytes = len(image_bytes)
-        min_size = 50 * 1024  # 50KB
+        min_size = 1 * 1024  # 1KB (very permissive)
         max_size = settings.max_image_size_mb * 1024 * 1024
 
         if size_bytes < min_size:
@@ -134,9 +134,9 @@ class ImageProcessor:
 
             image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
-        # Compress to JPEG with quality optimization
+        # Compress to JPEG with aggressive compression for speed
         output = io.BytesIO()
-        image.save(output, format='JPEG', quality=85, optimize=True)
+        image.save(output, format='JPEG', quality=70, optimize=True)
         output.seek(0)
 
         return output.getvalue()
