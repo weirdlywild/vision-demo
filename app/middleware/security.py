@@ -35,9 +35,29 @@ class SecurityMiddleware:
             return
 
         # Check authentication for API endpoints
-        if path.startswith("/diagnose") or path.startswith("/api/"):
-            await self._check_authentication(request)
-            await self._check_referrer(request)
+        if path.startswith("/diagnose") or path.startswith("/followup") or path.startswith("/api/"):
+            try:
+                await self._check_authentication(request)
+                await self._check_referrer(request)
+            except HTTPException as exc:
+                # Convert HTTPException to JSON response
+                response = JSONResponse(
+                    status_code=exc.status_code,
+                    content={"error": exc.detail}
+                )
+                await response(scope, receive, send)
+                return
+            except Exception as exc:
+                # Log unexpected errors
+                import traceback
+                print(f"Security middleware error: {exc}")
+                print(traceback.format_exc())
+                response = JSONResponse(
+                    status_code=500,
+                    content={"error": "Internal server error"}
+                )
+                await response(scope, receive, send)
+                return
 
         await self.app(scope, receive, send)
 

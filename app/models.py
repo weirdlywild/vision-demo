@@ -17,6 +17,14 @@ class RepairStep(BaseModel):
     safety_tip: Optional[str] = Field(None, description="Safety warning for this step")
 
 
+class UsageInfo(BaseModel):
+    """OpenAI API usage information."""
+    prompt_tokens: int = Field(0, description="Number of tokens in the prompt")
+    completion_tokens: int = Field(0, description="Number of tokens in the completion")
+    total_tokens: int = Field(0, description="Total tokens used")
+    model: str = Field(..., description="Model used for the request")
+
+
 class TimingInfo(BaseModel):
     """Timing breakdown for request."""
     total_time: float = Field(..., description="Total processing time in seconds")
@@ -25,6 +33,7 @@ class TimingInfo(BaseModel):
     openai_api_time: float = Field(0.0, description="OpenAI API call time")
     normalization_time: float = Field(0.0, description="Material normalization time")
     cache_source: Optional[str] = Field(None, description="Cache hit source (exact, perceptual, miss)")
+    usage: Optional[UsageInfo] = Field(None, description="OpenAI API token usage")
 
 
 class DiagnosisResponse(BaseModel):

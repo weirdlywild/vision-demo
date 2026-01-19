@@ -91,12 +91,15 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Handle uncaught exceptions."""
+    import traceback
+    print(f"ERROR: {exc}")
+    print(traceback.format_exc())
     return JSONResponse(
         status_code=500,
         content={
             "error": "internal_error",
             "message": "An unexpected error occurred",
-            "details": str(exc) if settings.openai_api_key else None
+            "details": str(exc)
         }
     )
 

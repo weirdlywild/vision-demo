@@ -25,9 +25,7 @@ async def diagnose(
 ):
     """
     Diagnose a broken household item from an image.
-
-    For initial diagnosis: Upload image only.
-    For follow-up questions: Include session_id and question.
+    For follow-up questions: Include session_id and question (dummy image will be ignored).
     """
     start_time = time.time()
     timing = {
@@ -39,6 +37,10 @@ async def diagnose(
     }
 
     try:
+        # Handle follow-up question (ignore dummy image)
+        if question and session_id:
+            return await _handle_followup(session_id, question, start_time)
+
         # Read image bytes
         image_bytes = await image.read()
         filename = image.filename or ""
@@ -67,10 +69,6 @@ async def diagnose(
                     cache_source='rejected'
                 )
             )
-
-        # Handle follow-up question
-        if question and session_id:
-            return await _handle_followup(session_id, question, start_time)
 
         # Step 2: Check exact cache
         cache_start = time.time()
@@ -211,13 +209,26 @@ def _format_diagnosis_response(
     # Build timing info if provided
     timing_info = None
     if timing and total_time is not None:
+        # Extract usage data from diagnosis if available
+        usage_info = None
+        if 'usage' in diagnosis:
+            from app.models import UsageInfo
+            usage_data = diagnosis['usage']
+            usage_info = UsageInfo(
+                prompt_tokens=usage_data.get('prompt_tokens', 0),
+                completion_tokens=usage_data.get('completion_tokens', 0),
+                total_tokens=usage_data.get('total_tokens', 0),
+                model=usage_data.get('model', 'unknown')
+            )
+
         timing_info = TimingInfo(
             total_time=round(total_time, 3),
             image_processing_time=round(timing.get('image_processing_time', 0.0), 3),
             cache_lookup_time=round(timing.get('cache_lookup_time', 0.0), 3),
             openai_api_time=round(timing.get('openai_api_time', 0.0), 3),
             normalization_time=round(timing.get('normalization_time', 0.0), 3),
-            cache_source=timing.get('cache_source')
+            cache_source=timing.get('cache_source'),
+            usage=usage_info
         )
 
     # Handle "unclear" status
@@ -287,6 +298,20 @@ async def health():
         "cache_stats": cache_stats,
         "active_sessions": session_count
     }
+
+
+@router.post("/followup", response_model=DiagnosisResponse)
+async def followup_question(
+    request: Request,
+    session_id: str = Form(..., description="Session ID from previous diagnosis"),
+    question: str = Form(..., description="Follow-up question")
+):
+    """
+    Ask a follow-up question about a previous diagnosis.
+    No image required - uses session context.
+    """
+    start_time = time.time()
+    return await _handle_followup(session_id, question, start_time)
 
 
 @router.post("/cache/clear")

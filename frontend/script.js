@@ -260,6 +260,17 @@ async function sendMessage() {
     formData.append('session_id', currentSessionId);
     formData.append('question', question);
 
+    // Create a tiny 1x1 transparent PNG as a dummy image for follow-up questions
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    canvas.toBlob(blob => {
+        formData.append('image', blob, 'dummy.png');
+        sendFollowupRequest(formData, statusId);
+    }, 'image/png');
+}
+
+async function sendFollowupRequest(formData, statusId) {
     try {
         const response = await fetch(`${API_BASE_URL}/diagnose`, {
             method: 'POST',
@@ -439,11 +450,25 @@ function displayDiagnosis(data, isFollowUp = false) {
     scrollToBottom();
 }
 
+function getModelPricing(model) {
+    // OpenAI pricing as of January 2026 (per 1M tokens)
+    const pricingTable = {
+        'gpt-4o': { input: 2.50, output: 10.00 },
+        'gpt-4o-2024-11-20': { input: 2.50, output: 10.00 },
+        'gpt-4o-2024-08-06': { input: 2.50, output: 10.00 },
+        'gpt-4o-2024-05-13': { input: 5.00, output: 15.00 },
+        'gpt-4o-mini': { input: 0.15, output: 0.60 },
+        'gpt-4o-mini-2024-07-18': { input: 0.15, output: 0.60 },
+        'gpt-5': { input: 5.00, output: 15.00 },  // Estimated pricing
+        'gpt-5-preview': { input: 5.00, output: 15.00 },
+        'gpt-5-turbo': { input: 2.50, output: 10.00 }
+    };
+
+    return pricingTable[model] || { input: 2.50, output: 10.00 };
+}
+
 function formatTimingInfo(timing) {
     const timingId = 'timing-' + Date.now();
-
-    // Calculate OpenAI cost (GPT-4o Vision pricing)
-    const openaiCost = calculateOpenAICost(timing);
 
     let html = '<div class="timing-info-compact">';
     html += `<span class="info-icon" onclick="toggleTimingDetails('${timingId}')">ℹ️ Details</span>`;
@@ -502,27 +527,38 @@ function formatTimingInfo(timing) {
     }
     html += '</div>'; // details-section
 
-    // OpenAI Pricing Section
-    if (timing.openai_api_time > 0) {
+    // OpenAI Pricing Section - Real data from API
+    if (timing.usage && timing.openai_api_time > 0) {
         html += '<div class="details-section">';
-        html += '<div class="section-header">💰 OpenAI Cost Estimate</div>';
+        html += '<div class="section-header">💰 OpenAI API Cost (Actual)</div>';
         html += '<div class="timing-row">';
         html += '<span class="timing-label">Model</span>';
-        html += '<span class="timing-value">GPT-4o Vision</span>';
+        html += `<span class="timing-value">${timing.usage.model}</span>`;
         html += '</div>';
+
+        // Calculate actual cost based on model pricing
+        const pricing = getModelPricing(timing.usage.model);
+        const inputCost = (timing.usage.prompt_tokens / 1_000_000) * pricing.input;
+        const outputCost = (timing.usage.completion_tokens / 1_000_000) * pricing.output;
+        const totalCost = inputCost + outputCost;
+
         html += '<div class="timing-row">';
-        html += '<span class="timing-label">Estimated Cost</span>';
-        html += `<span class="timing-value">~$${openaiCost.total.toFixed(4)}</span>`;
+        html += '<span class="timing-label"><strong>Total Cost</strong></span>';
+        html += `<span class="timing-value"><strong>$${totalCost.toFixed(4)}</strong></span>`;
         html += '</div>';
         html += '<div class="timing-row small">';
-        html += '<span class="timing-label">Input Tokens</span>';
-        html += `<span class="timing-value">${openaiCost.input_tokens} (~$${openaiCost.input_cost.toFixed(4)})</span>`;
+        html += '<span class="timing-label">Prompt Tokens</span>';
+        html += `<span class="timing-value">${timing.usage.prompt_tokens.toLocaleString()} ($${inputCost.toFixed(4)})</span>`;
         html += '</div>';
         html += '<div class="timing-row small">';
-        html += '<span class="timing-label">Output Tokens</span>';
-        html += `<span class="timing-value">${openaiCost.output_tokens} (~$${openaiCost.output_cost.toFixed(4)})</span>`;
+        html += '<span class="timing-label">Completion Tokens</span>';
+        html += `<span class="timing-value">${timing.usage.completion_tokens.toLocaleString()} ($${outputCost.toFixed(4)})</span>`;
         html += '</div>';
-        html += '<div class="cost-note">* Approximate based on typical usage</div>';
+        html += '<div class="timing-row small">';
+        html += '<span class="timing-label">Total Tokens</span>';
+        html += `<span class="timing-value">${timing.usage.total_tokens.toLocaleString()}</span>`;
+        html += '</div>';
+        html += '<div class="cost-note">* Actual usage from OpenAI API</div>';
         html += '</div>'; // details-section
     }
 
@@ -553,45 +589,6 @@ function formatTimingInfo(timing) {
     html += '</div>'; // timing-details
 
     return html;
-}
-
-function calculateOpenAICost(timing) {
-    // GPT-4o Vision pricing (as of 2024)
-    // Input: $2.50 per 1M tokens
-    // Output: $10.00 per 1M tokens
-
-    const INPUT_COST_PER_TOKEN = 2.50 / 1_000_000;
-    const OUTPUT_COST_PER_TOKEN = 10.00 / 1_000_000;
-
-    // Estimate token usage based on typical requests
-    // Image analysis typically uses ~1000-1500 input tokens (including image)
-    // Diagnosis output typically uses ~800-1500 output tokens
-
-    let input_tokens = 0;
-    let output_tokens = 0;
-
-    if (timing.openai_api_time > 0) {
-        // Estimate based on request type
-        if (timing.cache_source === 'followup') {
-            input_tokens = 500;  // Smaller context for follow-ups
-            output_tokens = 400;
-        } else {
-            input_tokens = 1200; // Image + prompts
-            output_tokens = 1000; // Full diagnosis
-        }
-    }
-
-    const input_cost = input_tokens * INPUT_COST_PER_TOKEN;
-    const output_cost = output_tokens * OUTPUT_COST_PER_TOKEN;
-    const total = input_cost + output_cost;
-
-    return {
-        input_tokens,
-        output_tokens,
-        input_cost,
-        output_cost,
-        total
-    };
 }
 
 function toggleTimingDetails(timingId) {

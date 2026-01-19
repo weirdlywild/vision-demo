@@ -1,7 +1,7 @@
 import base64
 import json
 import time
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Tuple
 from openai import AsyncOpenAI
 from openai import APIError, RateLimitError, APITimeoutError
 from app.config import settings
@@ -48,9 +48,34 @@ class VisionService:
         # Encode image to base64
         base64_image = base64.b64encode(image_bytes).decode('utf-8')
 
-        # Ultra-concise prompt for speed
-        enhanced_prompt = """Broken item analysis. JSON format. No brands/SKUs/URLs.
-{"object_identified":"", "failure_mode":"", "diagnosis":"", "confidence":0.8, "issue_type":"other", "diy_feasible":true, "materials":[{"name":"", "category":"", "search_query":""}], "tools_required":[], "repair_steps":[{"step":1, "title":"", "instruction":"", "safety_tip":""}], "warnings":[], "followup_questions":[]}"""
+        # Detailed analysis prompt
+        enhanced_prompt = """Analyze this image of a broken/damaged household item with expert attention to detail.
+
+STEP 1 - CAREFUL OBSERVATION:
+- Examine every visible detail in the image
+- Identify the object type and its current condition
+- Look for damage patterns: cracks, breaks, wear, corrosion, discoloration, leaks, misalignment
+- Check for secondary issues or hidden problems indicated by visual clues
+
+STEP 2 - ROOT CAUSE ANALYSIS:
+- Determine WHY this failure occurred (not just what failed)
+- Consider: age/wear, improper installation, stress/overload, manufacturing defect, environmental factors
+
+STEP 3 - COMPLEXITY ASSESSMENT:
+- Evaluate repair difficulty honestly
+- Determine if this is DIY-appropriate or requires professional help
+- Consider safety risks and required skill level
+
+STEP 4 - COMPREHENSIVE REPAIR PLAN:
+- List ALL tools needed upfront
+- Provide detailed step-by-step instructions with measurements where relevant
+- Include safety warnings for each dangerous step
+- Suggest 3-4 helpful follow-up questions the user might ask
+
+OUTPUT: Return valid JSON only (no markdown, no explanations outside JSON)
+Required format: {"object_identified":"specific item", "failure_mode":"what broke and why", "diagnosis":"detailed explanation", "confidence":0.0-1.0, "issue_type":"plumbing|electrical|door|furniture|appliance|other", "diy_feasible":true|false, "professional_help_recommended":"electrician|plumber|appliance technician|carpenter|none", "professional_help_reason":"reason if applicable", "estimated_time":"realistic estimate", "difficulty":"easy|moderate|hard", "materials":[{"name":"generic product", "category":"type", "search_query":"search term"}], "tools_required":["all tools needed"], "repair_steps":[{"step":1, "title":"step name", "instruction":"detailed instruction", "safety_tip":"warning"}], "warnings":["critical safety warnings"], "followup_questions":["helpful questions"]}
+
+CRITICAL: NO brand names, NO URLs, NO SKUs. Use generic product names only."""
 
         # Build messages
         messages = [
@@ -69,7 +94,7 @@ class VisionService:
                         "type": "image_url",
                         "image_url": {
                             "url": f"data:image/jpeg;base64,{base64_image}",
-                            "detail": "auto"
+                            "detail": "high"
                         }
                     }
                 ]
@@ -77,12 +102,14 @@ class VisionService:
         ]
 
         # Call GPT-4o with retry logic
-        response_json = await self._call_openai_with_retry(messages, model or settings.openai_model)
+        response_json, usage_data = await self._call_openai_with_retry(messages, model or settings.openai_model)
 
         # Parse and validate response with DSPy-inspired structure validation
         try:
             diagnosis = json.loads(response_json)
             diagnosis = self._validate_and_structure_diagnosis(diagnosis)
+            # Add usage data to diagnosis
+            diagnosis['usage'] = usage_data
         except json.JSONDecodeError as e:
             raise VisionServiceError(f"Invalid JSON response from GPT: {str(e)}")
         except Exception as e:
@@ -145,12 +172,14 @@ Required JSON structure:
         ]
 
         # Call GPT-4o with retry logic
-        response_json = await self._call_openai_with_retry(messages)
+        response_json, usage_data = await self._call_openai_with_retry(messages)
 
         # Parse and validate response with DSPy-inspired structure validation
         try:
             followup_response = json.loads(response_json)
             followup_response = self._validate_and_structure_diagnosis(followup_response)
+            # Add usage data to response
+            followup_response['usage'] = usage_data
         except json.JSONDecodeError as e:
             raise VisionServiceError(f"Invalid JSON response from GPT: {str(e)}")
         except Exception as e:
@@ -255,7 +284,7 @@ Required JSON structure:
                 })
         return validated
 
-    async def _call_openai_with_retry(self, messages: list, model: str = None) -> str:
+    async def _call_openai_with_retry(self, messages: list, model: str = None) -> Tuple[str, Dict]:
         """
         Call OpenAI API with exponential backoff retry.
 
@@ -264,7 +293,7 @@ Required JSON structure:
             model: OpenAI model to use
 
         Returns:
-            Response content string
+            Tuple of (response content string, usage dict with token counts)
 
         Raises:
             VisionServiceError: If all retries fail
@@ -282,7 +311,15 @@ Required JSON structure:
                     response_format={"type": "json_object"}
                 )
 
-                return response.choices[0].message.content
+                # Extract usage data from response
+                usage_data = {
+                    "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
+                    "completion_tokens": response.usage.completion_tokens if response.usage else 0,
+                    "total_tokens": response.usage.total_tokens if response.usage else 0,
+                    "model": model or settings.openai_model
+                }
+
+                return response.choices[0].message.content, usage_data
 
             except RateLimitError as e:
                 if attempt < max_retries - 1:
