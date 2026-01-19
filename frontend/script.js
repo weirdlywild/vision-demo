@@ -1,5 +1,5 @@
 // Configuration
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = 'http://localhost:8081';
 
 // State
 let currentSessionId = null;
@@ -86,6 +86,12 @@ async function handleImageUpload(file) {
     // Create form data
     const formData = new FormData();
     formData.append('image', file);
+
+    // Get selected model
+    const modelSelect = document.getElementById('modelSelect');
+    if (modelSelect) {
+        formData.append('model', modelSelect.value);
+    }
 
     if (currentSessionId) {
         formData.append('session_id', currentSessionId);
@@ -192,6 +198,37 @@ function displayDiagnosis(data, isFollowUp = false) {
         html += '<div class="confidence-bar">';
         html += `<div class="confidence-fill" style="width: ${data.confidence * 100}%"></div>`;
         html += '</div>';
+
+        // Professional help warning (if needed)
+        if (data.professional_help_recommended && data.professional_help_recommended !== 'none') {
+            html += '<div class="professional-warning">';
+            html += `<div class="warning-icon">⚠️</div>`;
+            html += `<div>`;
+            html += `<strong>Professional Help Recommended: ${data.professional_help_recommended}</strong>`;
+            if (data.professional_help_reason) {
+                html += `<div class="reason">${data.professional_help_reason}</div>`;
+            }
+            html += `</div>`;
+            html += '</div>';
+        }
+
+        // Quick info (estimated time, difficulty)
+        if (data.estimated_time || data.difficulty) {
+            html += '<div class="quick-info">';
+            if (data.estimated_time) {
+                html += `<span class="info-badge">⏱️ ${data.estimated_time}</span>`;
+            }
+            if (data.difficulty) {
+                const difficultyEmoji = {
+                    'easy': '✅',
+                    'moderate': '⚙️',
+                    'hard': '🔥'
+                }[data.difficulty] || '⚙️';
+                html += `<span class="info-badge">${difficultyEmoji} ${data.difficulty.charAt(0).toUpperCase() + data.difficulty.slice(1)}</span>`;
+            }
+            html += '</div>';
+        }
+
         html += '</div>';
 
         // Materials

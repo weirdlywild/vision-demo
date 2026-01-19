@@ -29,6 +29,21 @@
         </div>
 
         <div class="input-area">
+            <div class="model-selector">
+                <label for="modelSelect">AI Model:</label>
+                <select id="modelSelect">
+                    <option value="gpt-4o-mini">GPT-4o Mini (Fastest, ~3-5s)</option>
+                    <option value="gpt-4o-mini-2024-07-18">GPT-4o Mini 2024-07-18</option>
+                    <option value="gpt-4o">GPT-4o (Latest, ~15-20s)</option>
+                    <option value="gpt-4o-2024-11-20">GPT-4o 2024-11-20 (Enhanced)</option>
+                    <option value="gpt-4o-2024-08-06">GPT-4o 2024-08-06</option>
+                    <option value="gpt-4o-2024-05-13">GPT-4o 2024-05-13</option>
+                    <option value="gpt-5">GPT-5 (Next Generation)</option>
+                    <option value="gpt-5-preview">GPT-5 Preview</option>
+                    <option value="gpt-5-turbo">GPT-5 Turbo</option>
+                </select>
+            </div>
+
             <div class="upload-zone" id="uploadZone">
                 <input type="file" id="imageInput" accept="image/jpeg,image/png,image/webp" hidden>
                 <div class="upload-content">

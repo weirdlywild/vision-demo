@@ -30,13 +30,14 @@ class VisionService:
         self.initial_prompt = load_prompt("initial_diagnosis.txt")
         self.followup_prompt = load_prompt("followup_prompt.txt")
 
-    async def diagnose_image(self, image_bytes: bytes, context: str = "") -> Dict:
+    async def diagnose_image(self, image_bytes: bytes, context: str = "", model: str = None) -> Dict:
         """
         Diagnose an image using GPT-4o Vision with DSPy structured outputs.
 
         Args:
             image_bytes: Processed image bytes
             context: Optional context for follow-up questions
+            model: OpenAI model to use (defaults to settings.openai_model)
 
         Returns:
             Diagnosis dictionary with validated structure
@@ -76,7 +77,7 @@ class VisionService:
         ]
 
         # Call GPT-4o with retry logic
-        response_json = await self._call_openai_with_retry(messages)
+        response_json = await self._call_openai_with_retry(messages, model or settings.openai_model)
 
         # Parse and validate response with DSPy-inspired structure validation
         try:
@@ -178,6 +179,10 @@ Required JSON structure:
             "confidence": float(diagnosis.get("confidence", 0.5)),
             "issue_type": diagnosis.get("issue_type", "other"),
             "diy_feasible": bool(diagnosis.get("diy_feasible", True)),
+            "professional_help_recommended": diagnosis.get("professional_help_recommended", "none"),
+            "professional_help_reason": diagnosis.get("professional_help_reason", ""),
+            "estimated_time": diagnosis.get("estimated_time", "Varies"),
+            "difficulty": diagnosis.get("difficulty", "moderate"),
             "materials": self._validate_materials(diagnosis.get("materials", [])),
             "tools_required": diagnosis.get("tools_required", diagnosis.get("tools", [])),
             "repair_steps": self._validate_repair_steps(diagnosis.get("repair_steps", [])),
@@ -250,12 +255,13 @@ Required JSON structure:
                 })
         return validated
 
-    async def _call_openai_with_retry(self, messages: list) -> str:
+    async def _call_openai_with_retry(self, messages: list, model: str = None) -> str:
         """
         Call OpenAI API with exponential backoff retry.
 
         Args:
             messages: Chat messages
+            model: OpenAI model to use
 
         Returns:
             Response content string
@@ -269,7 +275,7 @@ Required JSON structure:
         for attempt in range(max_retries):
             try:
                 response = await self.client.chat.completions.create(
-                    model=settings.openai_model,
+                    model=model or settings.openai_model,
                     messages=messages,
                     max_tokens=settings.openai_max_tokens,
                     temperature=settings.openai_temperature,

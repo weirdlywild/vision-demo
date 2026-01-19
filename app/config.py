@@ -12,10 +12,10 @@ class Settings(BaseSettings):
 
     # Image Processing
     max_image_size_mb: int = 10
-    min_image_dimension: int = 200
+    min_image_dimension: int = 100
     max_image_dimension: int = 4096
     resize_max_dimension: int = 384  # Aggressive reduction for speed (was 512)
-    blur_threshold: int = 100
+    blur_threshold: int = 30  # Very permissive - only catch truly blurry images
     min_brightness: int = 40
     max_brightness: int = 240
 

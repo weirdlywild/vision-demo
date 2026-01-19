@@ -16,7 +16,8 @@ router = APIRouter()
 async def diagnose(
     image: UploadFile = File(..., description="Image of broken item"),
     session_id: Optional[str] = Form(None, description="Session ID for follow-up questions"),
-    question: Optional[str] = Form(None, description="Follow-up question")
+    question: Optional[str] = Form(None, description="Follow-up question"),
+    model: Optional[str] = Form(None, description="OpenAI model to use (gpt-4o, gpt-4o-mini)")
 ):
     """
     Diagnose a broken household item from an image.
@@ -95,7 +96,7 @@ async def diagnose(
 
         openai_start = time.time()
         try:
-            diagnosis = await vision_service.diagnose_image(processed_bytes)
+            diagnosis = await vision_service.diagnose_image(processed_bytes, model=model)
             timing['openai_api_time'] = time.time() - openai_start
         except VisionServiceError as e:
             raise HTTPException(status_code=500, detail=f"Vision service error: {str(e)}")
@@ -220,6 +221,10 @@ def _format_diagnosis_response(
         return DiagnosisResponse(
             diagnosis=diagnosis.get('reason', 'Image unclear'),
             confidence=0.1,
+            professional_help_recommended=None,
+            professional_help_reason=None,
+            estimated_time=None,
+            difficulty=None,
             materials=[],
             tools_required=[],
             repair_steps=[],
@@ -253,6 +258,10 @@ def _format_diagnosis_response(
         diagnosis=diagnosis.get('failure_mode', diagnosis.get('diagnosis', 'Unknown issue')),
         confidence=float(diagnosis.get('confidence', 0.5)),
         issue_type=diagnosis.get('issue_type'),
+        professional_help_recommended=diagnosis.get('professional_help_recommended'),
+        professional_help_reason=diagnosis.get('professional_help_reason'),
+        estimated_time=diagnosis.get('estimated_time'),
+        difficulty=diagnosis.get('difficulty'),
         materials=materials,
         tools_required=diagnosis.get('tools_required', diagnosis.get('tools', [])),
         repair_steps=repair_steps,
