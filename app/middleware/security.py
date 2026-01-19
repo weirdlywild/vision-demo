@@ -67,6 +67,8 @@ class SecurityMiddleware:
 
     async def _check_authentication(self, request: Request):
         """Validate API password from request headers."""
+        from urllib.parse import unquote
+
         auth_header = request.headers.get("X-API-Password")
 
         if not auth_header:
@@ -75,7 +77,10 @@ class SecurityMiddleware:
                 detail="Authentication required. Please provide X-API-Password header."
             )
 
-        if auth_header != settings.api_password:
+        # Decode URL-encoded password (frontend encodes special chars)
+        decoded_password = unquote(auth_header)
+
+        if decoded_password != settings.api_password:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Invalid authentication credentials."

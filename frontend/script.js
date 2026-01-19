@@ -201,11 +201,11 @@ async function handleImageUpload(file) {
         // Update status
         updateStatus(statusId, 'Analyzing with AI...');
 
-        // Send request with authentication
+        // Send request with authentication (encode password to handle special chars)
         const response = await fetch(`${API_BASE_URL}/diagnose`, {
             method: 'POST',
             headers: {
-                'X-API-Password': apiPassword
+                'X-API-Password': encodeURIComponent(apiPassword)
             },
             body: formData
         });
@@ -276,7 +276,7 @@ async function sendFollowupRequest(formData, statusId) {
         const response = await fetch(`${API_BASE_URL}/diagnose`, {
             method: 'POST',
             headers: {
-                'X-API-Password': apiPassword
+                'X-API-Password': encodeURIComponent(apiPassword)
             },
             body: formData
         });
