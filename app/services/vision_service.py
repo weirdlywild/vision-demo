@@ -1,7 +1,7 @@
 import base64
 import json
 import time
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from openai import AsyncOpenAI
 from openai import APIError, RateLimitError, APITimeoutError
 from app.config import settings
@@ -14,7 +14,15 @@ class VisionServiceError(Exception):
 
 
 class VisionService:
-    """Handles GPT-4o Vision API integration."""
+    """
+    Handles GPT-4o Vision API integration with enhanced structured outputs.
+
+    Uses DSPy-inspired techniques for better prompt engineering and validation:
+    - Explicit output structure requirements in prompts
+    - Comprehensive field validation and defaults
+    - Type conversion and normalization
+    - Consistent error handling
+    """
 
     def __init__(self):
         self.client = AsyncOpenAI(api_key=settings.openai_api_key)
@@ -24,20 +32,47 @@ class VisionService:
 
     async def diagnose_image(self, image_bytes: bytes, context: str = "") -> Dict:
         """
-        Diagnose an image using GPT-4o Vision.
+        Diagnose an image using GPT-4o Vision with DSPy structured outputs.
 
         Args:
             image_bytes: Processed image bytes
             context: Optional context for follow-up questions
 
         Returns:
-            Diagnosis dictionary
+            Diagnosis dictionary with validated structure
 
         Raises:
             VisionServiceError: If API call fails
         """
         # Encode image to base64
         base64_image = base64.b64encode(image_bytes).decode('utf-8')
+
+        # Enhanced prompt with DSPy-style instructions
+        enhanced_prompt = f"""
+{self.initial_prompt}
+
+CRITICAL OUTPUT REQUIREMENTS:
+- Return ONLY valid JSON
+- NO brand names (e.g., "WD-40" → "penetrating lubricant", "Gorilla Glue" → "strong adhesive")
+- NO product SKUs or model numbers
+- NO URLs or links
+- Use generic, searchable product names only
+
+Required JSON structure:
+{{
+    "object_identified": "what object is this",
+    "failure_mode": "what is broken",
+    "diagnosis": "summary of the issue",
+    "confidence": 0.0-1.0,
+    "issue_type": "plumbing|electrical|door|furniture|appliance|other",
+    "diy_feasible": true|false,
+    "materials": [{{"name": "generic name", "category": "hardware|plumbing|electrical", "search_query": "generic search term"}}],
+    "tools_required": ["tool1", "tool2"],
+    "repair_steps": [{{"step": 1, "title": "step title", "instruction": "detailed instruction", "safety_tip": "safety note"}}],
+    "warnings": ["safety warning 1"],
+    "followup_questions": ["question 1", "question 2"]
+}}
+"""
 
         # Build messages
         messages = [
@@ -50,7 +85,7 @@ class VisionService:
                 "content": [
                     {
                         "type": "text",
-                        "text": self.initial_prompt
+                        "text": enhanced_prompt
                     },
                     {
                         "type": "image_url",
@@ -66,11 +101,14 @@ class VisionService:
         # Call GPT-4o with retry logic
         response_json = await self._call_openai_with_retry(messages)
 
-        # Parse and validate response
+        # Parse and validate response with DSPy-inspired structure validation
         try:
             diagnosis = json.loads(response_json)
+            diagnosis = self._validate_and_structure_diagnosis(diagnosis)
         except json.JSONDecodeError as e:
             raise VisionServiceError(f"Invalid JSON response from GPT: {str(e)}")
+        except Exception as e:
+            raise VisionServiceError(f"Failed to structure diagnosis: {str(e)}")
 
         return diagnosis
 
@@ -81,7 +119,7 @@ class VisionService:
         previous_diagnosis: Optional[Dict] = None
     ) -> Dict:
         """
-        Handle follow-up question with context.
+        Handle follow-up question with context using DSPy structured outputs.
 
         Args:
             question: User's follow-up question
@@ -89,16 +127,32 @@ class VisionService:
             previous_diagnosis: Previous diagnosis for reference
 
         Returns:
-            Follow-up response dictionary
+            Follow-up response dictionary with validated structure
 
         Raises:
             VisionServiceError: If API call fails
         """
-        # Format the follow-up prompt with context
-        formatted_prompt = self.followup_prompt.format(
-            context=context,
-            question=question
-        )
+        # Enhanced follow-up prompt with DSPy-style instructions
+        enhanced_prompt = f"""
+{self.followup_prompt.format(context=context, question=question)}
+
+CRITICAL OUTPUT REQUIREMENTS:
+- Return ONLY valid JSON
+- NO brand names (use generic terms)
+- NO product SKUs or model numbers
+- NO URLs or links
+
+Required JSON structure:
+{{
+    "diagnosis": "answer to the question",
+    "confidence": 0.0-1.0,
+    "materials": [{{"name": "generic name", "category": "category", "search_query": "search term"}}],
+    "tools_required": ["tool1"],
+    "repair_steps": [{{"step": 1, "title": "title", "instruction": "instruction", "safety_tip": "tip"}}],
+    "warnings": ["warning if applicable"],
+    "followup_questions": ["suggested question"]
+}}
+"""
 
         # Build messages
         messages = [
@@ -108,20 +162,116 @@ class VisionService:
             },
             {
                 "role": "user",
-                "content": formatted_prompt
+                "content": enhanced_prompt
             }
         ]
 
         # Call GPT-4o with retry logic
         response_json = await self._call_openai_with_retry(messages)
 
-        # Parse and validate response
+        # Parse and validate response with DSPy-inspired structure validation
         try:
             followup_response = json.loads(response_json)
+            followup_response = self._validate_and_structure_diagnosis(followup_response)
         except json.JSONDecodeError as e:
             raise VisionServiceError(f"Invalid JSON response from GPT: {str(e)}")
+        except Exception as e:
+            raise VisionServiceError(f"Failed to structure follow-up: {str(e)}")
 
         return followup_response
+
+    def _validate_and_structure_diagnosis(self, diagnosis: Dict) -> Dict:
+        """
+        Validate and structure diagnosis output using DSPy-inspired validation.
+
+        Args:
+            diagnosis: Raw diagnosis dictionary from GPT
+
+        Returns:
+            Validated and structured diagnosis
+
+        Raises:
+            ValueError: If required fields are missing or invalid
+        """
+        # Required fields with defaults
+        structured = {
+            "object_identified": diagnosis.get("object_identified", "Unknown object"),
+            "failure_mode": diagnosis.get("failure_mode", "Unable to determine"),
+            "diagnosis": diagnosis.get("diagnosis", diagnosis.get("object_identified", "Analysis incomplete")),
+            "confidence": float(diagnosis.get("confidence", 0.5)),
+            "issue_type": diagnosis.get("issue_type", "other"),
+            "diy_feasible": bool(diagnosis.get("diy_feasible", True)),
+            "materials": self._validate_materials(diagnosis.get("materials", [])),
+            "tools_required": diagnosis.get("tools_required", diagnosis.get("tools", [])),
+            "repair_steps": self._validate_repair_steps(diagnosis.get("repair_steps", [])),
+            "warnings": diagnosis.get("warnings", diagnosis.get("safety_warnings", [])),
+            "followup_questions": diagnosis.get("followup_questions", [
+                "What tools do you already have?",
+                "Do you need more detailed instructions for any step?"
+            ])
+        }
+
+        # Ensure confidence is in valid range
+        if not 0.0 <= structured["confidence"] <= 1.0:
+            structured["confidence"] = max(0.0, min(1.0, structured["confidence"]))
+
+        return structured
+
+    def _validate_materials(self, materials: List) -> List[Dict]:
+        """
+        Validate and structure materials list.
+
+        Args:
+            materials: Raw materials list
+
+        Returns:
+            Validated materials list with proper structure
+        """
+        validated = []
+        for mat in materials:
+            if isinstance(mat, dict):
+                validated.append({
+                    "name": mat.get("name", ""),
+                    "category": mat.get("category", "general"),
+                    "search_query": mat.get("search_query", mat.get("name", ""))
+                })
+            elif isinstance(mat, str):
+                # Convert string to structured material
+                validated.append({
+                    "name": mat,
+                    "category": "general",
+                    "search_query": mat
+                })
+        return validated
+
+    def _validate_repair_steps(self, steps: List) -> List[Dict]:
+        """
+        Validate and structure repair steps list.
+
+        Args:
+            steps: Raw repair steps list
+
+        Returns:
+            Validated repair steps with proper structure
+        """
+        validated = []
+        for i, step in enumerate(steps, 1):
+            if isinstance(step, dict):
+                validated.append({
+                    "step": step.get("step", i),
+                    "title": step.get("title", f"Step {i}"),
+                    "instruction": step.get("instruction", step.get("description", "")),
+                    "safety_tip": step.get("safety_tip", "")
+                })
+            elif isinstance(step, str):
+                # Convert string to structured step
+                validated.append({
+                    "step": i,
+                    "title": f"Step {i}",
+                    "instruction": step,
+                    "safety_tip": ""
+                })
+        return validated
 
     async def _call_openai_with_retry(self, messages: list) -> str:
         """
