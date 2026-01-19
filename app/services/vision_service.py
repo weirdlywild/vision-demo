@@ -363,12 +363,15 @@ CRITICAL: NO brand names, NO URLs, NO SKUs. Use generic product names only."""
 
         for attempt in range(max_retries):
             try:
+                # Build API parameters
+                # Note: Some models (like gpt-4o-mini) only support temperature=1.0
+                # So we omit temperature parameter to let it default
                 response = await self.client.chat.completions.create(
                     model=model or settings.openai_model,
                     messages=messages,
-                    max_tokens=settings.openai_max_tokens,
-                    temperature=settings.openai_temperature,
+                    max_completion_tokens=settings.openai_max_tokens,
                     response_format={"type": "json_object"}
+                    # temperature omitted - defaults to 1.0
                 )
 
                 # Extract usage data from response
@@ -441,13 +444,15 @@ CRITICAL: NO brand names, NO URLs, NO SKUs. Use generic product names only."""
 
         try:
             # Call OpenAI with streaming enabled
+            # Note: Some models (like gpt-4o-mini) only support temperature=1.0
+            # So we omit temperature parameter to let it default
             stream = await self.client.chat.completions.create(
                 model=model or settings.openai_model,
                 messages=messages,
-                max_tokens=settings.openai_max_tokens,
-                temperature=settings.openai_temperature,
+                max_completion_tokens=settings.openai_max_tokens,
                 response_format={"type": "json_object"},
                 stream=True
+                # temperature omitted - defaults to 1.0
             )
 
             # Stream chunks as they arrive
