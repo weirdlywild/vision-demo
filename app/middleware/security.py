@@ -28,9 +28,13 @@ class SecurityMiddleware:
 
         request = Request(scope, receive)
 
-        # Skip authentication for static files and root
+        # Skip authentication for static files, root, docs, and health check
         path = request.url.path
-        if path.startswith("/static/") or path == "/":
+        if (path.startswith("/static/") or
+            path == "/" or
+            path == "/health" or
+            path == "/docs" or
+            path == "/openapi.json"):
             await self.app(scope, receive, send)
             return
 
