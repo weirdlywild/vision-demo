@@ -30,6 +30,7 @@ COPY --from=builder /root/.local /usr/local
 # Copy application code
 COPY ./app ./app
 COPY ./frontend ./frontend
+COPY ./run.py ./run.py
 
 # Create non-root user
 RUN useradd -m -u 1000 apiuser && chown -R apiuser:apiuser /app
@@ -46,5 +47,5 @@ EXPOSE ${PORT:-8000}
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request,os; urllib.request.urlopen(f'http://localhost:{os.getenv(\"PORT\",8000)}/health')"
 
-# Run application - use shell form to expand PORT variable
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Run application - use Python script to read PORT variable with debugging
+CMD ["python", "run.py"]
