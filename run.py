@@ -8,6 +8,13 @@ import uvicorn
 
 if __name__ == "__main__":
     # Railway sets PORT environment variable
+    import sys
+    print("=" * 50, file=sys.stderr)
+    print("RUN.PY IS EXECUTING!", file=sys.stderr)
+    print(f"All environment variables: {list(os.environ.keys())}", file=sys.stderr)
+    print(f"PORT variable: {os.getenv('PORT', 'NOT SET')}", file=sys.stderr)
+    print("=" * 50, file=sys.stderr)
+
     port = int(os.getenv("PORT", 8000))
     host = "0.0.0.0"
 
