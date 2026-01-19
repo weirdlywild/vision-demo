@@ -1,0 +1,25 @@
+Analyze this image of a potentially broken household item.
+
+ANALYSIS STEPS:
+
+1. What object/item is shown in the image?
+2. What appears to be broken, damaged, or malfunctioning?
+3. Can you clearly see the problem area?
+4. Is this repair safe for a DIY enthusiast (no gas, high voltage, structural work)?
+5. What materials and tools would be needed?
+6. What are the step-by-step repair instructions?
+7. What safety precautions should be taken?
+
+If you CANNOT clearly see the object or the damage:
+- Set "status": "unclear"
+- Provide specific reason why (too blurry, too dark, object not visible, etc.)
+- Suggest how user can improve the photo
+
+If you CAN see the object and damage:
+- Provide complete diagnosis following the JSON schema
+- Use ONLY generic material names (no brands, SKUs, URLs)
+- Include clear, sequential repair steps
+- List all necessary safety warnings
+- Suggest 2-3 relevant follow-up questions
+
+Remember: Output must be valid JSON only, with no text before or after the JSON object.

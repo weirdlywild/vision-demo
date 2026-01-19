@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DIY Repair Diagnosis - AI Assistant</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔧 DIY Repair Assistant</h1>
+            <p class="subtitle">Upload a photo of your broken item and I'll help you fix it!</p>
+        </header>
+
+        <div class="chat-container" id="chatContainer">
+            <div class="welcome-message">
+                <div class="icon">🛠️</div>
+                <h2>Welcome!</h2>
+                <p>I'm your AI repair assistant. Upload a photo of a broken household item, and I'll:</p>
+                <ul>
+                    <li>Diagnose what's wrong</li>
+                    <li>Provide step-by-step repair instructions</li>
+                    <li>List materials and tools you'll need</li>
+                    <li>Give you safety warnings</li>
+                </ul>
+                <p class="hint">Click the button below or drag & drop an image to get started!</p>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="upload-zone" id="uploadZone">
+                <input type="file" id="imageInput" accept="image/jpeg,image/png,image/webp" hidden>
+                <div class="upload-content">
+                    <div class="upload-icon">📷</div>
+                    <p><strong>Upload Photo</strong></p>
+                    <p class="upload-hint">Click or drag & drop</p>
+                    <p class="upload-formats">JPEG, PNG, WebP • Max 10MB</p>
+                </div>
+            </div>
+
+            <div class="message-input-container" id="messageContainer" style="display: none;">
+                <input type="text" id="messageInput" placeholder="Ask a follow-up question..." disabled>
+                <button id="sendButton" disabled>
+                    <span>Send</span>
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M2 10L18 2L10 18L8 11L2 10Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="session-info" id="sessionInfo" style="display: none;">
+            <span class="session-id">Session: <code id="sessionId"></code></span>
+            <button class="new-session-btn" id="newSessionBtn">New Diagnosis</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

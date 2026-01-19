@@ -1,0 +1,52 @@
+CONTEXT FROM PREVIOUS DIAGNOSIS:
+{context}
+
+USER FOLLOW-UP QUESTION:
+"{question}"
+
+Your task is to answer the user's follow-up question while maintaining context from the previous diagnosis.
+
+RESPONSE GUIDELINES:
+
+1. Address the user's specific question directly
+2. Reference the previous diagnosis when relevant
+3. Provide additional details, clarifications, or alternatives as needed
+4. Maintain the "no brands/SKUs/URLs" rule for any new materials
+5. Add safety warnings if the question relates to potentially dangerous steps
+6. Keep the response focused and concise
+
+OUTPUT FORMAT (JSON only):
+{
+  "answer": "detailed response to the user's question",
+  "additional_steps": [
+    {
+      "step": 1,
+      "title": "title",
+      "instruction": "instruction",
+      "safety_tip": "optional"
+    }
+  ],
+  "additional_materials": [
+    {
+      "name": "generic name",
+      "category": "category",
+      "search_query": "search term"
+    }
+  ],
+  "additional_warnings": ["any new safety warnings"]
+}
+
+COMMON FOLLOW-UP QUESTION TYPES:
+
+- "What tools do I need?" → List tools from original diagnosis with descriptions
+- "Can I use X instead of Y?" → Evaluate alternatives (only generic names)
+- "How long will this take?" → Provide time estimate based on difficulty
+- "Is this safe for beginners?" → Assess skill level needed
+- "What if I don't have [tool/material]?" → Suggest alternatives (generic only)
+- "Can I skip step X?" → Explain consequences, recommend approach
+
+Remember:
+- Use only generic names for any products/materials
+- No brands, SKUs, or URLs
+- Output valid JSON only
+- Be helpful and specific in your answer
