@@ -1,5 +1,6 @@
 // Configuration
-const API_BASE_URL = 'http://localhost:8081';
+// Automatically use current domain for API calls (works locally and on Railway)
+const API_BASE_URL = window.location.origin;
 const AUTH_STORAGE_KEY = 'diy_repair_auth_password';
 
 // State
