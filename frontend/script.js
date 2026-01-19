@@ -1,9 +1,11 @@
 // Configuration
 const API_BASE_URL = 'http://localhost:8081';
+const AUTH_STORAGE_KEY = 'diy_repair_auth_password';
 
 // State
 let currentSessionId = null;
 let currentImageFile = null;
+let apiPassword = null;
 
 // DOM Elements
 const chatContainer = document.getElementById('chatContainer');
@@ -15,13 +17,110 @@ const sendButton = document.getElementById('sendButton');
 const sessionInfo = document.getElementById('sessionInfo');
 const sessionIdDisplay = document.getElementById('sessionId');
 const newSessionBtn = document.getElementById('newSessionBtn');
+const authModal = document.getElementById('authModal');
+const authForm = document.getElementById('authForm');
+const passwordInput = document.getElementById('passwordInput');
+const authError = document.getElementById('authError');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    checkAuthentication();
     setupEventListeners();
 });
 
+// Authentication Functions
+function checkAuthentication() {
+    // Check if password is stored in localStorage
+    const storedPassword = localStorage.getItem(AUTH_STORAGE_KEY);
+
+    if (storedPassword) {
+        apiPassword = storedPassword;
+        hideAuthModal();
+    } else {
+        showAuthModal();
+    }
+}
+
+function showAuthModal() {
+    authModal.style.display = 'flex';
+    passwordInput.focus();
+}
+
+function hideAuthModal() {
+    authModal.style.display = 'none';
+}
+
+async function validatePassword(password) {
+    // Test the password by making a test request
+    try {
+        const formData = new FormData();
+        // Create a tiny test image (1x1 transparent PNG)
+        const testImageBlob = await fetch('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==')
+            .then(res => res.blob());
+        formData.append('image', testImageBlob, 'test.png');
+
+        const response = await fetch(`${API_BASE_URL}/diagnose`, {
+            method: 'POST',
+            headers: {
+                'X-API-Password': password
+            },
+            body: formData
+        });
+
+        // If we get 401 or 403, password is invalid
+        if (response.status === 401 || response.status === 403) {
+            return false;
+        }
+
+        // Any other response means password was accepted (even if image fails validation)
+        return true;
+    } catch (error) {
+        // Network error - assume password might be valid
+        console.error('Validation error:', error);
+        return true;
+    }
+}
+
+function showAuthError(message) {
+    authError.textContent = message;
+    authError.style.display = 'block';
+}
+
 function setupEventListeners() {
+    // Auth form submit
+    authForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const password = passwordInput.value.trim();
+
+        if (!password) {
+            showAuthError('Please enter a password');
+            return;
+        }
+
+        // Show loading state
+        const submitBtn = authForm.querySelector('button');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = 'Verifying...';
+        submitBtn.disabled = true;
+
+        // Validate password
+        const isValid = await validatePassword(password);
+
+        if (isValid) {
+            // Store password and close modal
+            localStorage.setItem(AUTH_STORAGE_KEY, password);
+            apiPassword = password;
+            hideAuthModal();
+            authError.style.display = 'none';
+        } else {
+            showAuthError('Invalid password. Please try again.');
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
+            passwordInput.value = '';
+            passwordInput.focus();
+        }
+    });
+
     // Upload zone click
     uploadZone.addEventListener('click', () => {
         imageInput.click();
@@ -101,13 +200,23 @@ async function handleImageUpload(file) {
         // Update status
         updateStatus(statusId, 'Analyzing with AI...');
 
-        // Send request
+        // Send request with authentication
         const response = await fetch(`${API_BASE_URL}/diagnose`, {
             method: 'POST',
+            headers: {
+                'X-API-Password': apiPassword
+            },
             body: formData
         });
 
         if (!response.ok) {
+            // Handle authentication errors
+            if (response.status === 401 || response.status === 403) {
+                localStorage.removeItem(AUTH_STORAGE_KEY);
+                apiPassword = null;
+                showAuthModal();
+                throw new Error('Authentication failed. Please log in again.');
+            }
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
@@ -154,10 +263,20 @@ async function sendMessage() {
     try {
         const response = await fetch(`${API_BASE_URL}/diagnose`, {
             method: 'POST',
+            headers: {
+                'X-API-Password': apiPassword
+            },
             body: formData
         });
 
         if (!response.ok) {
+            // Handle authentication errors
+            if (response.status === 401 || response.status === 403) {
+                localStorage.removeItem(AUTH_STORAGE_KEY);
+                apiPassword = null;
+                showAuthModal();
+                throw new Error('Authentication failed. Please log in again.');
+            }
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 

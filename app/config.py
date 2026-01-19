@@ -40,7 +40,8 @@ class Settings(BaseSettings):
 
     # Security
     allowed_origins: str = "*"
-    api_key_required: bool = False
+    api_password: str = "your-secure-password-here"
+    rate_limit_per_minute: int = 10
 
     model_config = SettingsConfigDict(
         env_file=".env",

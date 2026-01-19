@@ -1,4 +1,4 @@
-from fastapi import APIRouter, File, UploadFile, Form, HTTPException
+from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Request
 from typing import Optional
 import uuid
 import time
@@ -8,12 +8,16 @@ from app.services.vision_service import vision_service, VisionServiceError
 from app.services.session_manager import session_manager
 from app.services.cache_manager import cache_manager
 from app.utils.material_normalizer import MaterialNormalizer
+from app.middleware.security import limiter
+from app.config import settings
 
 router = APIRouter()
 
 
 @router.post("/diagnose", response_model=DiagnosisResponse)
+@limiter.limit(f"{settings.rate_limit_per_minute}/minute")
 async def diagnose(
+    request: Request,
     image: UploadFile = File(..., description="Image of broken item"),
     session_id: Optional[str] = Form(None, description="Session ID for follow-up questions"),
     question: Optional[str] = Form(None, description="Follow-up question"),

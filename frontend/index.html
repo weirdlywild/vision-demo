@@ -7,6 +7,26 @@
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+    <!-- Password Protection Modal -->
+    <div class="auth-modal" id="authModal">
+        <div class="auth-modal-content">
+            <div class="auth-icon">🔒</div>
+            <h2>Authentication Required</h2>
+            <p>Please enter your password to access the DIY Repair Assistant</p>
+            <form id="authForm">
+                <input
+                    type="password"
+                    id="passwordInput"
+                    placeholder="Enter password"
+                    required
+                    autocomplete="current-password"
+                >
+                <button type="submit">Unlock</button>
+                <div class="auth-error" id="authError" style="display: none;"></div>
+            </form>
+        </div>
+    </div>
+
     <div class="container">
         <header>
             <h1>🔧 DIY Repair Assistant</h1>

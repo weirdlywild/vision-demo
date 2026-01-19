@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
+from slowapi.errors import RateLimitExceeded
 import asyncio
 import os
 from pathlib import Path
@@ -10,6 +11,7 @@ from app.api.endpoints import router
 from app.services.session_manager import session_manager
 from app.services.cache_manager import cache_manager
 from app.config import settings
+from app.middleware.security import SecurityMiddleware, limiter, rate_limit_exceeded_handler
 
 
 # Background cleanup task
@@ -61,6 +63,9 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Add rate limiter to app state
+app.state.limiter = limiter
+
 # CORS middleware
 allowed_origins = settings.allowed_origins.split(",") if settings.allowed_origins != "*" else ["*"]
 app.add_middleware(
@@ -70,6 +75,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Security middleware (authentication and referrer checking)
+app.add_middleware(SecurityMiddleware)
+
+
+# Exception handlers
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    """Handle rate limit exceeded errors."""
+    return await rate_limit_exceeded_handler(request, exc)
 
 
 # Exception handlers
