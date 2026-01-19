@@ -408,6 +408,56 @@ CRITICAL: NO brand names, NO URLs, NO SKUs. Use generic product names only."""
 
         raise VisionServiceError("Max retries exceeded")
 
+    async def stream_followup(self, question: str, context: str, previous_diagnosis: dict, model: str = None):
+        """
+        Stream follow-up response from GPT.
+
+        Args:
+            question: User's follow-up question
+            context: Context from previous diagnosis
+            previous_diagnosis: Previous diagnosis for reference
+            model: OpenAI model to use (default from settings)
+
+        Yields:
+            Chunks of the response as they arrive
+
+        Raises:
+            VisionServiceError: If API call fails
+        """
+        # Use the followup prompt template with context and question
+        enhanced_prompt = self.followup_prompt.format(context=context, question=question)
+
+        # Build messages
+        messages = [
+            {
+                "role": "system",
+                "content": self.system_prompt
+            },
+            {
+                "role": "user",
+                "content": enhanced_prompt
+            }
+        ]
+
+        try:
+            # Call OpenAI with streaming enabled
+            stream = await self.client.chat.completions.create(
+                model=model or settings.openai_model,
+                messages=messages,
+                max_tokens=settings.openai_max_tokens,
+                temperature=settings.openai_temperature,
+                response_format={"type": "json_object"},
+                stream=True
+            )
+
+            # Stream chunks as they arrive
+            async for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+
+        except Exception as e:
+            raise VisionServiceError(f"Streaming error: {str(e)}")
+
 
 # Global vision service instance
 vision_service = VisionService()

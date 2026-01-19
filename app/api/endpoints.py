@@ -1,7 +1,9 @@
 from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from typing import Optional
 import uuid
 import time
+import json
 from app.models import DiagnosisResponse, ErrorResponse, Material, RepairStep, TimingInfo
 from app.services.image_processor import ImageProcessor, ImageQualityError
 from app.services.vision_service import vision_service, VisionServiceError
@@ -37,6 +39,8 @@ async def diagnose(
     }
 
     try:
+        import datetime
+        print(f"=== SERVER VERSION 2026-01-19-v2 === {datetime.datetime.now()}")
         print(f"DEBUG: /diagnose called - session_id={session_id}, question={question[:50] if question else None}")
 
         # Handle follow-up question (ignore dummy image)
@@ -197,6 +201,8 @@ async def _handle_followup(session_id: str, question: str, start_time: float) ->
         print(f"DEBUG: Merging followup response with previous diagnosis")
         merged_diagnosis = _merge_followup_response(previous_diagnosis, followup_response)
         print(f"DEBUG: Merged diagnosis keys: {merged_diagnosis.keys()}")
+        print(f"DEBUG AFTER MERGE: diagnosis = {merged_diagnosis.get('diagnosis', 'NOT SET')[:100]}")
+        print(f"DEBUG AFTER MERGE: failure_mode = {merged_diagnosis.get('failure_mode', 'NOT SET')[:100]}")
 
         # Update session
         session_manager.update_session(session_id, "followup", merged_diagnosis)
@@ -213,6 +219,7 @@ async def _handle_followup(session_id: str, question: str, start_time: float) ->
 
 def _merge_followup_response(previous: dict, followup: dict) -> dict:
     """Merge follow-up response into previous diagnosis."""
+    print("!!! ENTERED _merge_followup_response FUNCTION !!!")
     if not previous:
         # If no previous diagnosis, create a minimal one from followup
         previous = {
@@ -375,6 +382,90 @@ async def followup_question(
     """
     start_time = time.time()
     return await _handle_followup(session_id, question, start_time)
+
+
+@router.get("/diagnose/stream")
+async def diagnose_stream(
+    request: Request,
+    session_id: str,
+    question: str
+):
+    """
+    Stream follow-up question response in real-time using Server-Sent Events (SSE).
+    Uses GET with query parameters to support EventSource API.
+    """
+    # Get session context
+    context = session_manager.get_context(session_id)
+    if not context:
+        raise HTTPException(
+            status_code=404,
+            detail="Session not found or expired. Please start a new diagnosis."
+        )
+
+    # Get previous diagnosis
+    previous_diagnosis = session_manager.get_latest_diagnosis(session_id)
+    if not previous_diagnosis:
+        raise HTTPException(
+            status_code=404,
+            detail="No previous diagnosis found in session. Please start a new diagnosis."
+        )
+
+    async def event_generator():
+        """Generate SSE events for streaming response."""
+        try:
+            # Send initial event
+            yield f"data: {json.dumps({'type': 'start', 'message': 'Generating response...'})}\n\n"
+
+            # Collect full response for processing
+            full_response = ""
+
+            # Stream chunks from GPT
+            async for chunk in vision_service.stream_followup(question, context, previous_diagnosis):
+                full_response += chunk
+                # Send chunk to client
+                yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+
+            # Process the complete response
+            try:
+                # Clean and parse the JSON response
+                cleaned_response = vision_service._clean_json_response(full_response)
+                followup_response = json.loads(cleaned_response)
+                followup_response = vision_service._validate_followup_response(followup_response)
+
+                # Normalize materials
+                if 'additional_materials' in followup_response:
+                    followup_response['additional_materials'] = MaterialNormalizer.normalize_materials(
+                        followup_response['additional_materials']
+                    )
+
+                # Merge with previous diagnosis
+                merged_diagnosis = _merge_followup_response(previous_diagnosis, followup_response)
+
+                # Update session
+                session_manager.update_session(session_id, "followup", merged_diagnosis)
+
+                # Send complete event with structured data
+                yield f"data: {json.dumps({'type': 'complete', 'data': merged_diagnosis})}\n\n"
+
+            except json.JSONDecodeError as e:
+                yield f"data: {json.dumps({'type': 'error', 'message': f'Invalid response format: {str(e)}'})}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'type': 'error', 'message': f'Processing error: {str(e)}'})}\n\n"
+
+        except VisionServiceError as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': f'Unexpected error: {str(e)}'})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"  # Disable nginx buffering
+        }
+    )
 
 
 @router.post("/cache/clear")

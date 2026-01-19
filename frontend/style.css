@@ -754,3 +754,21 @@ header h1 {
     font-weight: 600;
     color: var(--gray-700);
 }
+
+/* Streaming text animation */
+.streaming-text {
+    position: relative;
+    color: var(--gray-700);
+    font-style: italic;
+}
+
+.streaming-text::after {
+    content: '...';
+    animation: dotPulse 1.5s infinite;
+}
+
+@keyframes dotPulse {
+    0%, 20% { content: '.'; }
+    40% { content: '..'; }
+    60%, 100% { content: '...'; }
+}
