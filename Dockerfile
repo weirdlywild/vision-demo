@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed packages from builder
-COPY --from=builder /root/.local /root/.local
+COPY --from=builder /root/.local /usr/local
 
 # Copy application code
 COPY ./app ./app
@@ -36,7 +36,7 @@ RUN useradd -m -u 1000 apiuser && chown -R apiuser:apiuser /app
 USER apiuser
 
 # Make Python packages available
-ENV PATH=/root/.local/bin:$PATH
+ENV PATH=/usr/local/bin:$PATH
 ENV PYTHONUNBUFFERED=1
 
 # Expose port
