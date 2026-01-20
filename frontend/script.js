@@ -510,10 +510,7 @@ function getModelPricing(model) {
         'gpt-4o-2024-08-06': { input: 2.50, output: 10.00 },
         'gpt-4o-2024-05-13': { input: 5.00, output: 15.00 },
         'gpt-4o-mini': { input: 0.15, output: 0.60 },
-        'gpt-4o-mini-2024-07-18': { input: 0.15, output: 0.60 },
-        'gpt-5': { input: 5.00, output: 15.00 },  // Estimated pricing
-        'gpt-5-preview': { input: 5.00, output: 15.00 },
-        'gpt-5-turbo': { input: 2.50, output: 10.00 }
+        'gpt-4o-mini-2024-07-18': { input: 0.15, output: 0.60 }
     };
 
     return pricingTable[model] || { input: 2.50, output: 10.00 };
