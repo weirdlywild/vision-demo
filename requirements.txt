@@ -3,7 +3,7 @@ uvicorn[standard]==0.27.0
 python-multipart==0.0.9
 pydantic==2.5.3
 pydantic-settings==2.1.0
-openai==1.10.0
+openai>=1.54.0
 dspy-ai==2.4.13
 numpy<2
 Pillow==10.2.0
