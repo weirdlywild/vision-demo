@@ -284,6 +284,40 @@ Images that fail validation return an "Image unclear" response without consuming
 - 24-hour TTL
 - Reduces redundant API calls
 
+## Project Structure
+
+```
+vision-demo/
+├── app/                    # Main application code
+│   ├── api/               # API endpoints
+│   ├── middleware/        # Security and rate limiting
+│   ├── models.py          # Pydantic models
+│   ├── prompts/           # GPT-4o prompts
+│   ├── services/          # Core business logic
+│   └── utils/             # Helper utilities
+├── docs/                  # Documentation
+│   ├── QUICKSTART.md      # Quick start guide
+│   ├── FRONTEND.md        # Frontend documentation
+│   └── ...                # Additional docs
+├── frontend/              # Web UI (HTML/CSS/JS)
+├── tests/                 # Test suite
+│   ├── test_api.py        # API integration tests
+│   └── test_*.py          # Unit tests
+├── .env.example           # Environment template
+├── Dockerfile             # Docker configuration
+├── railway.json           # Railway deployment config
+└── run.py                 # Production entry point
+```
+
+## Documentation
+
+Detailed documentation is available in the [docs/](docs/) folder:
+
+- **[Quick Start Guide](docs/QUICKSTART.md)** - Get started in 5 minutes
+- **[Frontend Documentation](docs/FRONTEND.md)** - Web interface details
+- **[Interface Guide](docs/INTERFACE_GUIDE.md)** - API usage guide
+- See [docs/README.md](docs/README.md) for full documentation index
+
 ## Testing
 
 ### Run Tests
@@ -310,6 +344,12 @@ curl -X POST "http://localhost:8000/diagnose" \
 # Blurry image (should be rejected)
 curl -X POST "http://localhost:8000/diagnose" \
   -F "image=@tests/fixtures/sample_images/blurry.jpg"
+```
+
+### Quick API Test
+
+```bash
+python tests/test_api.py path/to/image.jpg
 ```
 
 ## Troubleshooting
