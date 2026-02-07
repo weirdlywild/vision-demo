@@ -25,6 +25,10 @@ if __name__ == "__main__":
         "app.main:app",
         host=host,
         port=port,
-        workers=2,  # Use 2 workers for production
-        log_level="info"
+        # Single worker for Railway - Railway handles scaling
+        workers=1,
+        log_level="info",
+        # Add timeout settings for Railway
+        timeout_keep_alive=65,
+        timeout_graceful_shutdown=10
     )
